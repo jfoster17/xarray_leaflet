@@ -6,7 +6,7 @@ import xarray as xr
 from matplotlib import pyplot as plt
 import matplotlib as mpl
 import numpy as np
-import mercantile
+import morecantile
 from ipyleaflet import LocalTileLayer, WidgetControl, DrawControl
 from ipyspin import Spinner
 from ipywidgets import Output
@@ -34,6 +34,8 @@ class LeafletMap(HasTraits):
     def __init__(self, da):
         self._da = da
         self._da_selected = None
+        self.tms = morecantile.tms.get("WebMercatorQuad")
+
 
     def plot(self,
              m,
@@ -322,11 +324,11 @@ class LeafletMap(HasTraits):
             resolution = self.m.crs['resolutions'][z]
 
         if self.web_mercator:
-            tiles = list(mercantile.tiles(west, south, east, north, z))
+            tiles = list(self.tms.tiles(west, south, east, north, z))
         else:
             x0, x1 = int(left) // self.tile_width, int(right) // self.tile_width + 1
             y0, y1 = int(top) // self.tile_height, int(bottom) // self.tile_height + 1
-            tiles = [mercantile.Tile(x, y, z) for x in range(x0, x1) for y in range(y0, y1)]
+            tiles = [morecantile.Tile(x, y, z) for x in range(x0, x1) for y in range(y0, y1)]
 
         if self.dynamic:
             # dynamic maps are redrawn at each interaction with the map
@@ -335,9 +337,9 @@ class LeafletMap(HasTraits):
         elif self.web_mercator:
             # for static web mercator maps we can't redraw a tile once it has been (partly) displayed,
             # so we must slice the original data on tile boundaries
-            bbox = get_bbox_tiles(tiles)
+            bbox = get_bbox_tiles(self.tms, tiles)
             # take one more source data point to avoid glitches
-            da_visible = self._da.sel(y=slice(bbox.north + self.dy, bbox.south - self.dy), x=slice(bbox.west - self.dx, bbox.east + self.dx))
+            da_visible = self._da.sel(y=slice(bbox.top + self.dy, bbox.bottom - self.dy), x=slice(bbox.left - self.dx, bbox.right + self.dx))
         else:
             # it's a custom projection or not web mercator, the visible tiles don't translate easily
             # to a slice of the original data, so we keep everything
@@ -359,12 +361,12 @@ class LeafletMap(HasTraits):
             # if dynamic map, new tiles are always created
             if self.dynamic or not os.path.exists(path):
                 if self.web_mercator:
-                    bbox = mercantile.bounds(tile)
-                    xy_bbox = mercantile.xy_bounds(tile)
-                    x_pix = (xy_bbox.right - xy_bbox.left) / self.tile_width
-                    y_pix = (xy_bbox.top - xy_bbox.bottom) / self.tile_height
+                    bbox = self.tms.bounds(tile)
+                    xy_bbox = self.tms.xy_bounds(tile)
+                    x_pix = (xy_bbox.right - xy_bbox.left) // self.tile_width
+                    y_pix = (xy_bbox.top - xy_bbox.bottom) // self.tile_height
                     # take one more source data point to avoid glitches
-                    da_tile = da_visible.sel(y=slice(bbox.north + self.dy, bbox.south - self.dy), x=slice(bbox.west - self.dx, bbox.east + self.dx))
+                    da_tile = da_visible.sel(y=slice(bbox.top + self.dy, bbox.bottom - self.dy), x=slice(bbox.left - self.dx, bbox.right + self.dx))
                 else:
                     da_tile = da_visible
                 # check if we have data for this tile

@@ -2,7 +2,7 @@ import os
 import asyncio
 import numpy as np
 from PIL import Image
-import mercantile
+import morecantile
 from affine import Affine
 
 
@@ -48,16 +48,16 @@ def write_done_file(png_path, persist):
             f.write('delete')
 
 
-def get_bbox_tiles(tiles):
+def get_bbox_tiles(tms, tiles):
     north = east = -float('inf')
     south = west = float('inf')
     for tile in tiles:
-        bbox = mercantile.bounds(tile)
-        north = max(north, bbox.north)
-        south = min(south, bbox.south)
-        west = min(west, bbox.west)
-        east = max(east, bbox.east)
-    bbox_tiles = mercantile.LngLatBbox(west, south, east, north)
+        bbox = tms.bounds(tile)
+        north = max(north, bbox.top)
+        south = min(south, bbox.bottom)
+        west = min(west, bbox.left)
+        east = max(east, bbox.right)
+    bbox_tiles = morecantile.BoundingBox(west, south, east, north)
     return bbox_tiles
 
 
